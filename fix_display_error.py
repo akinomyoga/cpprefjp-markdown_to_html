@@ -32,6 +32,12 @@ def is_item_end_line(line: str) -> bool:
         return True
     return False
 
+def indent_level(line: str) -> int:
+    m = re.match(r'^\s+', line)
+    if m:
+        return len(m.group(0).replace('\t', '    '))
+    return 0
+
 class FixDisplayErrorExtension(Extension):
 
     def extendMarkdown(self, md, md_globals):
@@ -50,22 +56,32 @@ class FixDisplayErrorPreprocessor(Preprocessor):
         new_lines = []
 
         prev_line: str | None = None
+        prev_line_is_item: bool = False
         in_item: bool = False
+        paragraph_item_indent_level: int = 0
         for line in lines:
             if prev_line == None:
                 prev_line = line
                 new_lines.append(line)
                 continue
 
-            if not is_item_line(prev_line) and not in_item and is_item_line(line):
-                new_lines.append("")
+            line_is_item: bool = is_item_line(line)
+            if line_is_item:
+                if not (prev_line_is_item or in_item):
+                    new_lines.append("")
+                elif in_item and indent_level(line) < paragraph_item_indent_level:
+                    new_lines.append("")
 
-            if not in_item and is_item_line(line):
+                if not in_item:
+                    paragraph_item_indent_level = indent_level(line)
+
                 in_item = True
-            if in_item and is_item_end_line(line):
+
+            elif in_item and is_item_end_line(line):
                 in_item = False
 
             prev_line = line
+            prev_line_is_item = line_is_item
             new_lines.append(line)
 
         return new_lines
